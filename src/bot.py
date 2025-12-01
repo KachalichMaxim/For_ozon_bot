@@ -11,6 +11,7 @@ from telegram.ext import (
 from .config import Config
 from .sheets_manager import SheetsManager
 from .ozon_client import OzonClient
+from .utils import extract_offer_id_number
 
 
 logger = logging.getLogger(__name__)
@@ -273,8 +274,58 @@ class OzonBot:
                 )
                 return
             
-            # Sort products by offer_id alphabetically
-            all_products.sort(key=lambda x: str(x.get("offer_id", "")).lower())
+            # Filter products: only include those with valid offer_id numbers (1-99)
+            # and sort by extracted number (ascending)
+            filtered_products = []
+            for product in all_products:
+                offer_id = product.get("offer_id", "")
+                number = extract_offer_id_number(offer_id)
+                if number is not None:  # Only include products with valid numbers (1-99)
+                    product["_sort_number"] = number  # Add sort key
+                    filtered_products.append(product)
+                else:
+                    logger.debug(
+                        f"Skipping product with offer_id '{offer_id}' "
+                        f"(no valid number 1-99 found)"
+                    )
+            
+            # Sort by extracted number (ascending: 1, 2, 3, ..., 99)
+            filtered_products.sort(key=lambda x: x.get("_sort_number", 999))
+            
+            # Remove temporary sort key
+            for product in filtered_products:
+                product.pop("_sort_number", None)
+            
+            # Use filtered and sorted products
+            all_products = filtered_products
+            
+            if not all_products:
+                # Show message if no valid products after filtering
+                message_text = (
+                    f"ℹ️ Для склада {warehouse_name} нет товаров с "
+                    f"валидными Offer ID (номера 1-99)."
+                )
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            "🔄 Получить отправления",
+                            callback_data=f"refresh_{warehouse_name}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "⬅️ Назад к складам",
+                            callback_data="back_to_warehouses"
+                        )
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message_text,
+                    reply_markup=reply_markup
+                )
+                return
             
             # Save to Tasks sheet
             success = self.sheets_manager.add_to_tasks(all_products, warehouse_name)
