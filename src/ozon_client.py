@@ -66,18 +66,19 @@ class OzonClient:
         url = f"{OZON_API_BASE_URL}/v1/assembly/fbs/posting/list"
         
         # Default filter if none provided
-        # API requires both cutoff_from and cutoff_to in filter
-        # We get only fresh orders (not older than 1 week)
+        # API requires BOTH cutoff_from and cutoff_to
         if filter_dict is None:
-            # Use a date 7 days ago as cutoff_from to get only fresh orders
+            # Use a date 30 days ago as cutoff_from to get orders
             # Format: YYYY-MM-DDThh:mm:ss.mcsZ
-            cutoff_from = (datetime.utcnow() - timedelta(days=7)).strftime(
+            cutoff_from = (datetime.utcnow() - timedelta(days=30)).strftime(
                 "%Y-%m-%dT%H:%M:%S.000Z"
             )
-            # cutoff_to is end of today (current UTC time)
-            cutoff_to = datetime.utcnow().strftime(
-                "%Y-%m-%dT%H:%M:%S.999Z"
-            )
+            # Set cutoff_to to end of today (23:59:59.999Z) to ensure
+            # we capture all orders for today, even if there's a delay
+            now = datetime.utcnow()
+            cutoff_to = now.replace(
+                hour=23, minute=59, second=59, microsecond=999000
+            ).strftime("%Y-%m-%dT%H:%M:%S.999Z")
             filter_dict = {
                 "cutoff_from": cutoff_from,
                 "cutoff_to": cutoff_to
@@ -85,18 +86,21 @@ class OzonClient:
         
         # Ensure filter has required cutoff_from field
         if "cutoff_from" not in filter_dict:
-            # Add cutoff_from if missing (7 days ago for fresh orders)
-            cutoff_from = (datetime.utcnow() - timedelta(days=7)).strftime(
+            # Add cutoff_from if missing (30 days ago)
+            cutoff_from = (datetime.utcnow() - timedelta(days=30)).strftime(
                 "%Y-%m-%dT%H:%M:%S.000Z"
             )
             filter_dict["cutoff_from"] = cutoff_from
         
         # Ensure filter has required cutoff_to field
+        # API requires cutoff_to - set to end of today if not provided
         if "cutoff_to" not in filter_dict:
-            # Add cutoff_to if missing (end of today)
-            cutoff_to = datetime.utcnow().strftime(
-                "%Y-%m-%dT%H:%M:%S.999Z"
-            )
+            # Set cutoff_to to end of today to ensure we capture
+            # all orders for today
+            now = datetime.utcnow()
+            cutoff_to = now.replace(
+                hour=23, minute=59, second=59, microsecond=999000
+            ).strftime("%Y-%m-%dT%H:%M:%S.999Z")
             filter_dict["cutoff_to"] = cutoff_to
         
         # Ensure limit is within API constraints
@@ -118,6 +122,10 @@ class OzonClient:
                 logger.info(
                     f"Fetching postings from Ozon API "
                     f"(limit={limit}, attempt={attempt + 1}/{max_retries})"
+                )
+                logger.info(
+                    f"Filter: cutoff_from={filter_dict.get('cutoff_from')}, "
+                    f"cutoff_to={filter_dict.get('cutoff_to', 'not set')}"
                 )
                 logger.debug(f"Request payload: {payload}")
                 logger.debug(f"Request headers: {dict(self.headers)}")

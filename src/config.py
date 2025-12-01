@@ -55,3 +55,4 @@ class Config:
         """Get absolute path to service account JSON file."""
         return Path(cls.GOOGLE_SERVICE_ACCOUNT_JSON).resolve()
 
+

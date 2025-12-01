@@ -23,6 +23,8 @@ pip install -r requirements.txt
 - Verify `GOOGLE_SHEETS_ID` matches your Google Sheet
 - Ensure `GOOGLE_SERVICE_ACCOUNT_JSON` path is correct
 
+**Note:** The Google Service Account JSON file (`tonal-concord-464913-u3-2024741e839c.json`) is not included in the repository for security reasons. You need to place it in the project directory manually.
+
 3. Set up Google Sheets:
 - Share your Google Sheet with the service account email from the JSON file
 - Ensure sheets "Ozon", "Access", "Tasks", and "ProcessedOrders" exist
